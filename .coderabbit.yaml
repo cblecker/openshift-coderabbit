@@ -372,6 +372,30 @@ reviews:
           > /payload-job periodic-ci-openshift-release-main-nightly-4.22-e2e-metal-ovn-two-node-fencing-techpreview
           > ```
 
+      - name: "OTE Binary Stdout Contract"
+        mode: error
+        instructions: |
+          OpenShift Tests Extension (OTE) binaries communicate with `openshift-tests` via
+          JSON on stdout. Any non-JSON stdout from the main binary process corrupts the
+          test listing and breaks CI. Individual test cases (It, BeforeEach, AfterEach) are
+          fine — their stdout is intercepted by the framework.
+
+          Only flag stdout writes in process-level code: main(), init(), TestMain(),
+          BeforeSuite(), AfterSuite(), SynchronizedBeforeSuite(), RunSpecs() setup, or
+          top-level var/const initializers.
+
+          Common violations:
+          - klog writing to stdout (default behavior — must redirect to stderr via
+            `klog.SetOutput(os.Stderr)` or `klog.LogToStderr(true)`)
+          - fmt.Print/Println/Printf to stdout in main or suite setup
+          - Ginkgo v2 suite configuration that emits warnings to stdout
+          - log.SetOutput not set to stderr before any logging
+
+          Do NOT flag:
+          - Writes inside It(), BeforeEach(), AfterEach(), JustBeforeEach() blocks
+          - Writes to explicitly-opened files or buffers
+          - Writes to os.Stderr or GinkgoWriter
+
       - name: "IPv6 and Disconnected Network Test Compatibility"
         mode: warning
         instructions: |
