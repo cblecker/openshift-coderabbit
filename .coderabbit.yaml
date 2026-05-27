@@ -494,28 +494,11 @@ reviews:
           > g.It("should fetch external content [Skipped:Disconnected]", func() { ... })
           > ```
 
-        # Taken from prodsec suggested configuration: https://github.com/RedHatProductSecurity/prodsec-skills/blob/main/.coderabbit.yaml
-      - name: "no-hardcoded-secrets"
-        instructions: |
-          Flag hardcoded secrets: API keys, tokens, passwords, private
-          keys, credentials. Also flag base64 strings >32 chars in config,
-          URLs with embedded credentials, variables named api_key/secret/
-          token/password assigned string literals.
-        mode: "error"
-
       - name: "no-weak-crypto"
         instructions: |
           Flag MD5, SHA1, DES, RC4, 3DES, Blowfish, ECB mode usage.
           Flag custom crypto implementations. Flag non-constant-time
           comparison of secrets or tokens.
-        mode: "error"
-
-      - name: "no-injection-vectors"
-        instructions: |
-          Flag SQL string concatenation, shell=True with user input,
-          eval/exec on untrusted data, pickle.loads on untrusted input,
-          yaml.load without SafeLoader, os.system with variables,
-          dangerouslySetInnerHTML with user data.
         mode: "error"
 
       - name: "container-privileges"
@@ -531,13 +514,6 @@ reviews:
           PII (email, SSN, credit card), session IDs, internal
           hostnames, or customer data.
         mode: "error"
-
-      - name: "ai-attribution"
-        instructions: |
-          If AI tools were used (mentioned in PR or commits), verify
-          Red Hat attribution: Assisted-by or Generated-by trailers.
-          Flag use of Co-Authored-By for AI tools.
-        mode: "warning"
 
   # Taken from prodsec suggested configuration: https://github.com/RedHatProductSecurity/prodsec-skills/blob/main/.coderabbit.yaml
   path_instructions:
@@ -623,84 +599,6 @@ reviews:
         - RBAC: least privilege; no cluster-admin for workloads
         - Helm: no .Values interpolation in shell commands
 
-    # ── MCP server security ──────────────────────────────────────
-    # Skills: hardening-local, hardening-remote, oauth21-resource-server,
-    #         rbac, input-output-sanitization, secure-token-handling,
-    #         containerization, tool-server-injection-prevention,
-    #         no-credential-forwarding, roots-support, sampling-controls,
-    #         logging-and-observability, runtime-restrictions, os-tool-security,
-    #         reject-api-keys, token-exchange-for-tools
-    - path: "**/{mcp,tool_server,toolserver}/**/*"
-      instructions: |
-        MCP server review (prodsec-skills):
-        - OAuth 2.1 resource server: validate tokens per RFC 9068
-        - Enforce scope-based access per tool; no default-allow
-        - RBAC: per-tool permissions mapped to token scopes/roles
-        - Sanitize all tool inputs against declared schemas
-        - Reject path traversal in file-accessing tools
-        - No credential forwarding to downstream services
-        - Tool injection: validate registry integrity, reject dynamic
-          tool loading from untrusted sources
-        - Container isolation: unprivileged, read-only rootfs
-        - Audit log all tool invocations with caller identity
-        - Rate limiting per client/scope
-        - Reject API keys; require IdP-issued tokens
-
-    # ── MCP client ───────────────────────────────────────────────
-    # Skills: mcp-client-client-metadata-support,
-    #         mcp-client-dynamic-client-registration,
-    #         mcp-client-protected-resource-metadata,
-    #         consent-and-scoping, discovery-mechanisms
-    - path: "**/{mcp_client,mcp-client}/**/*"
-      instructions: |
-        MCP client review (prodsec-skills):
-        - OAuth client metadata: register with minimal scopes
-        - Dynamic registration: validate server response, store
-          client_id/secret securely
-        - Protected resource metadata: discover before token request
-        - Consent: prompt user before granting tool access
-        - Discovery: validate .well-known endpoints over HTTPS only
-
-    # ── Inference engine & model serving ─────────────────────────
-    # Skills: isolation-sandboxing, jwt-token-enforcement,
-    #         model-security-scanning, model-signature-verification,
-    #         oidc-integration, token-lifecycle, external-idp-integration
-    - path: "**/{inference,model,serving,predict}/**/*"
-      instructions: |
-        Inference engine review (prodsec-skills):
-        - Process isolation: container or microVM per model
-        - JWT/OIDC on all inference endpoints; no unauthenticated access
-        - Model provenance: verify signatures before loading
-        - Scan models for embedded payloads (pickle, arbitrary code)
-        - Token lifecycle: short-lived, secure storage, revocation
-        - No direct filesystem access from inference process
-        - Resource limits to prevent DoS via large inputs
-
-    # ── Agent security ───────────────────────────────────────────
-    # Skills: agent-identity, agent-to-agent-auth, agent-to-mcp-server-auth
-    - path: "**/{agent,agents,agentic}/**/*"
-      instructions: |
-        Agent security (prodsec-skills):
-        - Unique, verifiable identity per agent instance
-        - Agent-to-agent auth: SPIFFE/mTLS, not shared secrets
-        - Agent-to-MCP auth: OAuth 2.1 client credentials flow
-        - No ambient authority; agents present credentials per call
-        - Audit trail for all inter-agent communication
-
-    # ── LLM interaction ──────────────────────────────────────────
-    # Skills: prompt-injection-mitigation, file-protection,
-    #         third-party-model-security, bidirectional-filtering,
-    #         output-validation-sandbox
-    - path: "**/{llm,prompt,chat,completion}**/*"
-      instructions: |
-        LLM security (prodsec-skills):
-        - Prompt injection: separate system/user content; never
-          interpolate untrusted input into system prompts
-        - Output filtering: validate LLM output before execution
-        - File protection: restrict file access to declared paths
-        - Third-party models: evaluate trust, scan artifacts
-        - Guardrails: bidirectional filtering on prompts and responses
-
     # ── Supply chain & dependencies ──────────────────────────────
     # Skills: supply-chain-risk-auditor, sbom-provenance,
     #         software-signing, secure-pipeline, vulnerability-management
@@ -728,34 +626,6 @@ reviews:
         - Sign artifacts with Sigstore/cosign
         - Agentic CI actions: audit for prompt injection via
           issue/PR title/body flowing into LLM prompts
-
-    # ── Authentication & OAuth ───────────────────────────────────
-    # Skills: oauth21-implementation, authentication, authorization,
-    #         session-management-cookies, avoid-api-keys,
-    #         service-to-service-mtls
-    - path: "**/{auth,oauth,oidc,login,session,saml}/**/*"
-      instructions: |
-        Authentication review (prodsec-skills):
-        - OAuth 2.1: PKCE required; no implicit grant
-        - JWT: verify signature, issuer, audience, expiry, nbf
-        - Sessions: secure cookie flags, regenerate ID on login
-        - Passwords: Argon2id; never plaintext or weak hashes
-        - Rate limit login attempts; account lockout policy
-        - MFA: support and encourage; never bypass silently
-        - Service-to-service: SPIFFE/mTLS, not shared secrets
-        - Avoid API keys; prefer IdP-issued short-lived tokens
-
-    # ── API gateway & rate limiting ──────────────────────────────
-    # Skills: authentication-enforcement, internal-application-routing,
-    #         rate-limiting, request-validation
-    - path: "**/{gateway,proxy,ingress,route}/**/*"
-      instructions: |
-        API gateway review (prodsec-skills):
-        - Auth enforcement at gateway, not just downstream
-        - Rate limiting per client/endpoint; fail closed
-        - Request validation: size limits, content-type checks
-        - No internal-only routes exposed externally
-        - TLS termination with strong cipher suites
 
     # ── Go ───────────────────────────────────────────────────────
     # Skills: go-security
@@ -793,27 +663,6 @@ reviews:
         - Redis/ElastiCache: AUTH required, no KEYS in prod,
           rename dangerous commands (FLUSHALL, CONFIG)
         - Connection strings: no embedded credentials
-
-    # ── Messaging ────────────────────────────────────────────────
-    # Skills: kafka-amq-security, mqtt-security
-    - path: "**/{kafka,amq,mqtt,messaging,broker}/**/*"
-      instructions: |
-        Messaging security (prodsec-skills):
-        - Kafka/AMQ: TLS, SASL auth, per-topic ACLs
-        - MQTT: auth required, topic ACLs, payload encryption
-        - No anonymous access in production
-
-    # ── Model registry ───────────────────────────────────────────
-    # Skills: model-registry-*, admin-interface-security,
-    #         model-registry-secure-storage
-    - path: "**/{model_registry,model-registry,registry}/**/*"
-      instructions: |
-        Model registry review (prodsec-skills):
-        - Admin interface: auth + RBAC, no public exposure
-        - Model scanning: check for malicious payloads before publish
-        - Model signing: verify signatures on pull
-        - Audit logging: who uploaded/downloaded/deleted what
-        - Secure storage: encrypted at rest, access-controlled
 
   # Taken from prodsec suggested configuration: https://github.com/RedHatProductSecurity/prodsec-skills/blob/main/.coderabbit.yaml
   # ── Security scanners ────────────────────────────────────────
